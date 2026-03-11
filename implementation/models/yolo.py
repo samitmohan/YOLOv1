@@ -17,9 +17,9 @@ class YOLOV1(nn.Module):
     def __init__(self, img_size, num_classes, model_config):
         super(YOLOV1, self).__init__()
         self.img_size = img_size
-        self.img_channels = model_config('img_channels')
+        self.img_channels = model_config['im_channels']
         self.backbone_channels = model_config['backbone_channels']
-        self.yolo_convChannel = model_config(['yolo_convChannel'])
+        self.yolo_convChannel = model_config['yolo_conv_channels']
         self.conv_spatial_size = model_config['conv_spatial_size']
         self.leaky_relu_slope = model_config['leaky_relu_slope']
         self.yolo_fc_hidden_dim = model_config['fc_dim']
@@ -62,13 +62,13 @@ class YOLOV1(nn.Module):
             # Final layer
             self.fc_yolo_layers = nn.Sequential(
                 nn.Flatten(),
-                nn.Linear(self.conv_spatial_size * self.conv_spatial_size * self.yolo_convChannel * self.yolo_fc_hidden_dim),
+                nn.Linear(self.conv_spatial_size * self.conv_spatial_size * self.yolo_convChannel, self.yolo_fc_hidden_dim),
                 nn.LeakyReLU(self.leaky_relu_slope),
                 nn.Dropout(self.yolo_fc_dropout_prob),
-                nn.Lienar(self.yolo_fc_hidden_dim, self.S * self.S * (5 * self.B + self.C)),
+                nn.Linear(self.yolo_fc_hidden_dim, self.S * self.S * (5 * self.B + self.C)),
             )
 
-    def forward(self x):
+    def forward(self, x):
         out = self.features(x)
         out = self.conv_layers(out)
         out = self.fc_yolo_layers(out)

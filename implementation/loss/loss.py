@@ -11,7 +11,8 @@ def iou(b1, b2):
     y_topleft = torch.max(b1[..., 1], b2[..., 1])
     x_bottomright = torch.min(b1[..., 2], b2[..., 2])
     y_bottomright = torch.min(b1[..., 3], b2[..., 3])
-    intersection_area = (x_bottomright - x_topleft).clamp(min=0)
+    intersection_area = ((x_bottomright - x_topleft).clamp(min=0)
+                         * (y_bottomright - y_topleft).clamp(min=0))
     union_area = area1.clamp(min=0) + area2.clamp(min=0) - intersection_area
     iou = intersection_area / (union_area + 1E-6) # for error
     return iou
@@ -19,6 +20,7 @@ def iou(b1, b2):
 class YOLOLoss(nn.Module):
     '''Localisation loss, Objectness loss, Classification loss'''
     def __init__(self, S=7, B=2, C=20):
+        super(YOLOLoss, self).__init__()
         self.S = S
         self.B = B
         self.C = C
@@ -34,16 +36,16 @@ class YOLOLoss(nn.Module):
         # shape: batch, S, S, 5B+c
         preds = preds.reshape(batch_size, self.S, self.S, 5 * self.B + self.C)
         if use_sigmoid:
-            preds[..., :5 * self.B] = torch.nn.functional.sigmoid(preds[..., :5 * self.B])        
-        
+            preds[..., :5 * self.B] = torch.nn.functional.sigmoid(preds[..., :5 * self.B])
+
         # Shifting from xcenter, ycenter -> x1, y1 , x2, y2 (normalised 0-1)
-        xshift = torch.arange(0, self.S) * 1 / float(self.S) # S * (1 / S)
-        yshift = torch.arange(0, self.S) * 1 / float(self.S) # S * (1 / S)
-        # create grid 
-        shifty, shiftx = torch.meshgrid(xshift, yshift, indexing='ij')
+        xshift = torch.arange(0, self.S).float() / float(self.S)
+        yshift = torch.arange(0, self.S).float() / float(self.S)
+        # create grid
+        yshift, xshift = torch.meshgrid(yshift, xshift, indexing='ij')
         # shifts -> [1, S, S, B]
-        xshift = xshift.reshape((1, self.S, self.S, 1)).repeat(1, 1, 1, self.B)
-        yshift = yshift.reshape((1, self.S, self.S, 1)).repeat(1, 1, 1, self.B)
+        xshift = xshift.reshape((1, self.S, self.S, 1)).repeat(1, 1, 1, self.B).to(preds.device)
+        yshift = yshift.reshape((1, self.S, self.S, 1)).repeat(1, 1, 1, self.B).to(preds.device)
 
         # pred = batchsize, S, S, B, 5
         pred_boxes = preds[..., :5 * self.B].reshape(batch_size, self.S, self.S, self.B, -1)
@@ -84,11 +86,11 @@ class YOLOLoss(nn.Module):
 
         # iou between pred and target boxes
         iou_pred_target = iou(pred_boxes_x1y1x2y2, target_boxes_x1y1x2y2)
-        max_iou_val, max_iou_idx = iou.max(dim=-1, keepdim=True) # -1 means outer
+        max_iou_val, max_iou_idx = iou_pred_target.max(dim=-1, keepdim=True) # -1 means outer
 
         # need to do this again since paper calculates 2 bounding box for 1 grid cell
 
-        
+
         max_iou_idx = max_iou_idx.repeat(1, 1, 1, self.B)
         # bb_idxs -> (Batch_size, S, S, B)
         #  Eg. [[0, 1], [0, 1], [0, 1], [0, 1]] assuming B = 2
@@ -118,7 +120,7 @@ class YOLOLoss(nn.Module):
 
         # LL
         x_mse = (pred_boxes[..., 0] - target_boxes[..., 0]) ** 2
-        # only keep losses from boxes which have obj 
+        # only keep losses from boxes which have obj
         x_mse = (is_max_box_obj_indicator * x_mse).sum()
         y_mse = (pred_boxes[..., 1] - target_boxes[..., 1]) ** 2
         y_mse = (is_max_box_obj_indicator * y_mse).sum()
@@ -137,8 +139,6 @@ class YOLOLoss(nn.Module):
         # total
         loss = self.lambda_coord*(x_mse + y_mse + w_sqrt_mse + h_sqrt_mse)
         loss += cls_loss + obj_mse
-        loss += self.lambda_noobj*no_obj_mse
+        loss += self.lambda_no_obj*no_obj_mse
         loss = loss / batch_size
         return loss
-
-

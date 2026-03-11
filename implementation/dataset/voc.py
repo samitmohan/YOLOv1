@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 
 def load_images_annotations(imgSet, label2idx, annotation_frame, split):
     # Get XML Files -> Get all objects and GT det for dataset
-    img_info, ims = [], []
+    all_img_info = []
     for img_set in imgSet:
         img_names = []
         for line in open(os.path.join(img_set, 'ImageSets', 'Main', '{}.txt'.format(annotation_frame))):
@@ -23,7 +23,7 @@ def load_images_annotations(imgSet, label2idx, annotation_frame, split):
             size = root.find('size')
             width, height = int(size.find('width').text), int(size.find('height').text)
             img_info['img_id'] = os.path.basename(annotation_file).split('.xml')[0]
-            img_info['filename'] = of.path.join(img_dir, '{}.jpg'.format(img_info['img_id']))
+            img_info['filename'] = os.path.join(img_dir, '{}.jpg'.format(img_info['img_id']))
             img_info['width'], img_info['height'] = width, height
             detections = []
             valid_obj = False
@@ -45,11 +45,11 @@ def load_images_annotations(imgSet, label2idx, annotation_frame, split):
                     valid_obj=True
             if valid_obj:
                 img_info['detections'] = detections
-                img_info.append(img_info)
+                all_img_info.append(img_info)
 
-        print(f"Total {len(img_info)} images found")
-        return img_info
-    
+    print(f"Total {len(all_img_info)} images found")
+    return all_img_info
+
 class VOCDataset(Dataset):
     def __init__(self, split, img_sets, img_size=448, S=7,B=2,C=20):
         self.split=split
@@ -76,11 +76,11 @@ class VOCDataset(Dataset):
                     always_apply=None,
                     p=0.5,
                 ),
-                alb.Resize(self.im_size, self.im_size)],
+                alb.Resize(self.img_size, self.img_size)],
                 bbox_params=alb.BboxParams(format='pascal_voc',
                                             label_fields=['labels'])),
             'test': alb.Compose([
-                alb.Resize(self.im_size, self.im_size),
+                alb.Resize(self.img_size, self.img_size),
                 ],
                 bbox_params=alb.BboxParams(format='pascal_voc',
                                             label_fields=['labels']))
@@ -131,7 +131,7 @@ class VOCDataset(Dataset):
         if len(bboxes) > 0:
             # convert x1,y1,x2,y2 -> x,y,w,h format
             box_width = bboxes_tensor[:, 2] - bboxes_tensor[:, 0]
-            box_height = bboxes_tensor[:, 3] - bboxes_tensor[: 1]
+            box_height = bboxes_tensor[:, 3] - bboxes_tensor[:, 1]
             box_centerx = bboxes_tensor[:, 0] + 0.5 * box_width
             box_centery = bboxes_tensor[:, 1] + 0.5 * box_height
             # cell i, j from xc, yc
@@ -163,10 +163,3 @@ class VOCDataset(Dataset):
             'difficult': difficult,
         }
         return img_tensor, targets, img_info['filename']
-
-
-
-
-
-
-                         

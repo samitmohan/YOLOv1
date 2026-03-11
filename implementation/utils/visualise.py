@@ -75,7 +75,7 @@ def draw_grid(img, grid_shape, color=(0, 0, 0), thickness=2):
     return grid_im
 
 
-def draw_cls_grid(img, clis_idx, grid_shape):
+def draw_cls_grid(img, cls_idx, grid_shape):
     """ Draws color coded grid for the entire image coded based on the class label """
     rect_im = np.copy(img)
     h, w, _ = rect_im.shape

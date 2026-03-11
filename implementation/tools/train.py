@@ -9,7 +9,7 @@ from tqdm import tqdm
 from dataset.voc import VOCDataset
 from torch.utils.data.dataloader import DataLoader
 from torch.optim.lr_scheduler import MultiStepLR
-from loss.yolov1_loss import YOLOV1Loss
+from loss.loss import YOLOLoss
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -35,9 +35,14 @@ def train(args):
     if device == 'cuda':
         torch.cuda.manual_seed_all(seed)
 
-    voc = VOCDataset('train', im_sets=dataset_config['train_im_sets'])
+    voc = VOCDataset('train',
+                     img_sets=dataset_config['train_im_sets'],
+                     img_size=dataset_config['im_size'],
+                     S=model_config['S'],
+                     B=model_config['B'],
+                     C=dataset_config['num_classes'])
     train_dataset = DataLoader(voc, batch_size=train_config['batch_size'], shuffle=True, collate_fn=collate_function)
-    yolo_model = YOLOV1(im_size=dataset_config['im_size'], num_classes=dataset_config['num_classes'], model_config=model_config)
+    yolo_model = YOLOV1(img_size=dataset_config['im_size'], num_classes=dataset_config['num_classes'], model_config=model_config)
     yolo_model.train()
     yolo_model.to(device)
     if os.path.exists(os.path.join(train_config['task_name'], train_config['ckpt_name'])):
@@ -50,7 +55,7 @@ def train(args):
     optimizer = torch.optim.SGD(lr=train_config['lr'], params=filter(lambda p: p.requires_grad, yolo_model.parameters()), weight_decay=5E-4, momentum=0.9)
 
     scheduler = MultiStepLR(optimizer, milestones=train_config['lr_steps'], gamma=0.5)
-    criterion = YOLOV1Loss()
+    criterion = YOLOLoss(S=model_config['S'], B=model_config['B'], C=dataset_config['num_classes'])
     acc_steps = train_config['acc_steps']
     num_epochs = train_config['num_epochs']
     steps = 0

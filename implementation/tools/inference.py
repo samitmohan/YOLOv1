@@ -8,7 +8,7 @@ from tqdm import tqdm
 import numpy as np
 from models.yolo import YOLOV1
 from dataset.voc import VOCDataset
-from utils.visualization_utils import *
+from utils.visualise import *
 from torch.utils.data.dataloader import DataLoader
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -151,14 +151,14 @@ def load_model_and_dataset(args):
     train_config = config['train_params']
 
     voc = VOCDataset('test',
-                     im_sets=dataset_config['test_im_sets'],
-                     im_size=dataset_config['im_size'],
+                     img_sets=dataset_config['test_im_sets'],
+                     img_size=dataset_config['im_size'],
                      S=model_config['S'],
                      B=model_config['B'],
                      C=dataset_config['num_classes'])
     test_dataset = DataLoader(voc, batch_size=1, shuffle=False)
 
-    yolo_model = YOLOV1(im_size=dataset_config['im_size'],
+    yolo_model = YOLOV1(img_size=dataset_config['im_size'],
                         num_classes=dataset_config['num_classes'],
                         model_config=model_config)
     yolo_model.eval()
@@ -271,7 +271,7 @@ def infer(args):
         cv2.imwrite('samples/preds/{}_pred.jpeg'.format(i), out_img)
 
         # Below lines of code are only for drawing class prob map
-        im = cv2.resize(im, (yolo_model.im_size, yolo_model.im_size))
+        im = cv2.resize(im, (yolo_model.img_size, yolo_model.img_size))
 
         # Draw a SxS grid on image
         grid_im = draw_grid(im, (yolo_model.S, yolo_model.S))
